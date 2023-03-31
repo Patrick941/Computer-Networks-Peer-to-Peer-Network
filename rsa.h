@@ -17,6 +17,10 @@ extern uint32_t Node_PubKeys[NUM_NODES][RSA_KEYLEN];
 //-------------------------------
 
 void rsaGetPubKey(char* IP, uint32_t publicKey[]); // Input an ip, publicKey[] will return null if user isnt in the network, or a key if they are
+int verifySig(char* IP, char* rawMsg, char* signature); // Pass IP of sender, RAW message, and signature of sender, Will return 1 if match 0 if false.
+
+void rsaEncrypt(char* inputMsg, char* privKey, char* encryptedMsg); // inputMsg should be 256bit hash, priv key and output will be in encrypted msg
+void rsaDecrypt(char* encryptedMsg, char* pubKey, char* decrypedMsg); // input msg to decrypt, public key and output will be in decrypted msg
 
 
 #endif
