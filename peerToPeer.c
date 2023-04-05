@@ -308,6 +308,7 @@ void * receiving(){
                         strcat(msgReceived, AlicePubKey);
                         token = strtok(NULL, s);
                         // signature
+                        printf("No SEG yet\n");
                         int verified = verifySig("10.35.70.7", msgReceived, &token[3]);
                         if (verified) {
                             printf("Verified!\n");
