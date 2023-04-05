@@ -289,10 +289,22 @@ void * receiving(){
                     // verify and send signature back
                     token = strtok(buffer, s);
                     printf("%s\n", token);
-                    while (token!= NULL) {
-                        token = strtok(buffer, s);
-                        printf("%s\n", token);
+                    // KEY74187281928481...
+                    char* BobPubKey = token;
+
+                    token = strtok(NULL, s);
+                    printf("%s\n", token);
+                    // PUB849267388284682...
+                    char* AlicePubKey = token;
+                    char* initMessage = mpz_get_str(NULL, 16, myPubKey);
+                    if (strcmp(&AlicePubKey[3], initMessage)) {
+                        printf("Was my pub key whoop\n");
                     }
+
+
+                    token = strtok(NULL, s);
+                    printf("%s\n", token);
+
                 }
                 break;
             }
