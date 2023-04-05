@@ -9,8 +9,8 @@
 #include "diffie.h"
 #include "aesV4.h"
 #include "aesV4.c"
-#include "hash.h"
-#include "hash.c"
+//#include "hash.h"
+//#include "hash.c"
 #include "rsa.h"
 #include "rsa.c"
 
@@ -269,9 +269,9 @@ void * receiving(){
                 char* hashSTR = sha256(message);
                 
                 strcat(message, "\nSIG");
-                strcat(message, rsaEncrypt(hashSTR, rsaPrivKey, rsaPubKey););
+                strcat(message, rsaEncrypt(hashSTR, rsaPrivKey, rsaPubKey));
 
-                printf("Sending the following message:\n %s\n", mesaage);
+                printf("Sending the following message:\n %s\n", message);
 
             } else {
                 // contains 2 keys and a signature
