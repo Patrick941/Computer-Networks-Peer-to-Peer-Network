@@ -298,7 +298,7 @@ void * receiving(){
                     
                     char* AlicePubKey = token;
                     char* initMessage = mpz_get_str(NULL, 16, myPubKey);
-                    printf("OUR KEY: %s\n", initMessage)
+                    printf("OUR KEY: %s\n", initMessage);
                     if (strcmp(&AlicePubKey[3], initMessage)) {
                         printf("\n\nWas my pub key whoop\n\n");
                     }
