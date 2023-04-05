@@ -151,7 +151,7 @@ void * sending(){
         // Prevent print statement running twice when creating connection
         if(firstMessage != 1){
             pthread_mutex_lock(&lock);
-            printf("Message %s:%i: ", ip, PORT);
+            //printf("Message %s:%i: ", ip, PORT);
             pthread_mutex_unlock(&lock);
         }
         fflush(stdout);
@@ -274,7 +274,7 @@ void * receiving(){
                 strcat(message, rsaEncrypt(hashSTR, rsaPrivKey, rsaPubKey));
                 strcat(message, "\n");
 
-                printf("Sending the following message:\n%s\n", message);
+                //printf("Sending the following message:\n%s\n", message);
                 boolSent = 1;
                 sendto(sock, message, strlen(message), 0, (sockaddr *)&peer_addr, sizeof(peer_addr));
 
@@ -297,7 +297,7 @@ void * receiving(){
                 //printf("OUR KEY: %s\n", initMessage);
                 //printf("No SEG yet\n");
                 if (strcmp(&token[3], initMessage) == 0) {
-                    printf("\n\nWas my pub key whoop\n\n");
+                    printf("Connection Made, Working on RSA Digital Signature...\n");
                     // when pub key matches
                         
                     token = strtok(NULL, s);
@@ -305,7 +305,7 @@ void * receiving(){
                     //printf("No SEG yet\n");
                     int verified = verifySig("10.35.70.7", msgReceived, &token[3]);
                     if (verified) {
-                        printf("Verified!\n");
+                        printf("Signature Verified, Beginning AES encryption...\n");
                         // private key
                         // sign doc and send
                         if (boolSent) {
@@ -373,13 +373,15 @@ void * receiving(){
                         strcat(message, rsaEncrypt(hashSTR, rsaPrivKey, rsaPubKey));
                         strcat(message, "\n");
 
-                        printf("Sending the following message:\n%s\n", message);
+                        //printf("Sending the following message:\n%s\n", message);
                         boolSent = 1;
                         sendto(sock, message, strlen(message), 0, (sockaddr *)&peer_addr, sizeof(peer_addr));
 
+                        printf("Message %s:%i: ", ip, PORT);
+
                         break;
                     } else {
-                        printf("Bad Time\n");
+                        printf("ERROR: Digital Signature Does Not Match!!!\n");
                     }
                 }
             }
