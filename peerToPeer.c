@@ -250,7 +250,7 @@ void * receiving(){
         //if statement, check if its got a signature or not first,
         // Wait until a message is received
         socklen_t addr_len = sizeof(peer_addr);
-        int n = recvfrom(sock, buffer, 1024, 0, (sockaddr *)&peer_addr, &addr_len);
+        int n = recvfrom(sock, buffer, 4096, 0, (sockaddr *)&peer_addr, &addr_len);
         buffer[n] = '\0';
 
         if (buffer[0] == 'K' && buffer[1] == 'E' && buffer[2] == 'Y') {
