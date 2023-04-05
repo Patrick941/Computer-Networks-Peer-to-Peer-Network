@@ -298,13 +298,27 @@ void * receiving(){
                     
                     char* AlicePubKey = token;
                     char* initMessage = mpz_get_str(NULL, 16, myPubKey);
-                    printf("OUR KEY: %s\n", initMessage);
-                    if (strcmp(&AlicePubKey[3], initMessage)) {
+                    //printf("OUR KEY: %s\n", initMessage);
+                    if (strcmp(&AlicePubKey[3], initMessage) == 0) {
                         printf("\n\nWas my pub key whoop\n\n");
+                        // when pub key matches
+                        char* msgReceived;
+                        strcpy(msgReceived, BobPubKey);
+                        strcat(msgReceived, "\n");
+                        strcat(msgReceived, AlicePubKey);
+                        token = strtok(NULL, s);
+                        // signature
+                        int verified = verifySig("10.35.70.7", msgReceived, token[3]);
+                        if (verified) {
+                            printf("Verified!\n");
+                        } else {
+                            printf("Bad Time\n");
+                        }
+
                     }
 
 
-                    token = strtok(NULL, s);
+                    //token = strtok(NULL, s);
                     //printf("%s\n", token);
 
                 }
