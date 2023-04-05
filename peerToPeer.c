@@ -309,10 +309,73 @@ void * receiving(){
                         // private key
                         // sign doc and send
                         if (boolSent) {
+                            token = strtok(buffer, s);
+
+                            mpz_set_str(recievedPubKey, &token[3], 16);
+                            calcSecretKey(privKey, recievedPubKey, prime, secretKey);
+                            char * key = mpz_get_str(NULL, 16, secretKey);
+                            for (int i = 0; i < 32; i += 2) {
+                                char c1 = key[i];
+                                char c2 = key[i + 1];
+                                int value = 0;
+            
+                                if (c1 >= '0' && c1 <= '9') {
+                                    value += (c1 - '0') * 16;
+                                } else if (c1 >= 'a' && c1 <= 'f') {
+                                    value += (c1 - 'a' + 10) * 16;
+                                }
+
+                                if (c2 >= '0' && c2 <= '9') {
+                                    value += c2 - '0';
+                                } else if (c2 >= 'a' && c2 <= 'f') {
+                                    value += c2 - 'a' + 10;
+                                }
+
+                                secretKeyStr[i/2] = value;
+                            }
                             break;
                         }
-
                         
+                        strcpy(message, "KEY");
+                        char * initMessage = mpz_get_str(NULL, 16, myPubKey);
+                        strcat(message, initMessage);
+
+                        strcat(message, "\nPUB");
+                        token = strtok(buffer, s);
+                        strcat(message, &token[3]);
+
+                        mpz_set_str(recievedPubKey, &token[3], 16);
+                        calcSecretKey(privKey, recievedPubKey, prime, secretKey);
+                        char * key = mpz_get_str(NULL, 16, secretKey);
+                        for (int i = 0; i < 32; i += 2) {
+                            char c1 = key[i];
+                            char c2 = key[i + 1];
+                            int value = 0;
+            
+                            if (c1 >= '0' && c1 <= '9') {
+                                value += (c1 - '0') * 16;
+                            } else if (c1 >= 'a' && c1 <= 'f') {
+                                value += (c1 - 'a' + 10) * 16;
+                            }
+            
+                            if (c2 >= '0' && c2 <= '9') {
+                                value += c2 - '0';
+                            } else if (c2 >= 'a' && c2 <= 'f') {
+                                value += c2 - 'a' + 10;
+                            }
+
+                            secretKeyStr[i/2] = value;
+                        }
+
+                        char* hashSTR = sha256(message);
+                
+                        strcat(message, "\nSIG");
+                        strcat(message, rsaEncrypt(hashSTR, rsaPrivKey, rsaPubKey));
+                        strcat(message, "\n");
+
+                        printf("Sending the following message:\n%s\n", message);
+                        boolSent = 1;
+                        sendto(sock, message, strlen(message), 0, (sockaddr *)&peer_addr, sizeof(peer_addr));
 
                         break;
                     } else {
