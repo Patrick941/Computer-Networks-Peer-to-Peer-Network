@@ -382,46 +382,7 @@ void * receiving(){
                         printf("Bad Time\n");
                     }
                 }
-                //break;
             }
-        }
-
-        // Check if the message is a key
-        if(buffer[0] == 'K' && buffer[1] == 'E' && buffer[2] == 'Y'){
-            // Parse public key and use it to calculate secretKey
-            strcpy(tempKey, &buffer[3]);
-            mpz_set_str(recievedPubKey, tempKey, 16);
-            calcSecretKey(privKey, recievedPubKey, prime, secretKey);
-
-            // Shorten secret key
-            char * key = mpz_get_str(NULL, 16, secretKey);
-            for (int i = 0; i < 32; i += 2) {
-                char c1 = key[i];
-                char c2 = key[i + 1];
-                int value = 0;
-            
-                if (c1 >= '0' && c1 <= '9') {
-                    value += (c1 - '0') * 16;
-                } else if (c1 >= 'a' && c1 <= 'f') {
-                    value += (c1 - 'a' + 10) * 16;
-                }
-            
-                if (c2 >= '0' && c2 <= '9') {
-                    value += c2 - '0';
-                } else if (c2 >= 'a' && c2 <= 'f') {
-                    value += c2 - 'a' + 10;
-                }
-
-                secretKeyStr[i/2] = value;
-            }
-            //gmp_printf("Secret Key: %ZX\n", secretKey);
-            //printf("Key has beeen receievd: %gmp\n", recievedPubKey);
-            //gmp_printf("Received %ZX\n",recievedPubKey);
-            char * initMessage = mpz_get_str(NULL, 16, myPubKey);
-            sprintf(message, "%s%s", "KEY", initMessage);
-            //printf("Sending following message: %s\n", message);
-            sendto(sock, message, strlen(message), 0, (sockaddr *)&peer_addr, sizeof(peer_addr));
-            break;
         }
     }
 
