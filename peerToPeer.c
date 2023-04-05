@@ -306,6 +306,7 @@ void * receiving(){
                     int verified = verifySig("10.35.70.7", msgReceived, &token[3]);
                     if (verified) {
                         printf("Signature Verified, Beginning AES encryption...\n");
+                        printf("Message %s:%i: ", ip, PORT);
                         // private key
                         // sign doc and send
                         if (boolSent) {
@@ -329,7 +330,7 @@ void * receiving(){
                                     value += c2 - '0';
                                 } else if (c2 >= 'a' && c2 <= 'f') {
                                     value += c2 - 'a' + 10;
-                                }
+                                }printf("Message %s:%i: ", ip, PORT);
 
                                 secretKeyStr[i/2] = value;
                             }
@@ -377,7 +378,6 @@ void * receiving(){
                         boolSent = 1;
                         sendto(sock, message, strlen(message), 0, (sockaddr *)&peer_addr, sizeof(peer_addr));
 
-                        printf("Message %s:%i: ", ip, PORT);
 
                         break;
                     } else {
