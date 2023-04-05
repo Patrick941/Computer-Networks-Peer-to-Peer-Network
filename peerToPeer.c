@@ -287,25 +287,26 @@ void * receiving(){
 
                 } else {
                     // verify and send signature back
+                    char* msgReceived
+
                     token = strtok(buffer, s);
                     printf("%s\n", token);
                     // KEY74187281928481...
-                    char* BobPubKey = token;
+                    strcpy(msgReceived, token);
+                    strcat(msgReceived, "\n");
+                    
 
                     token = strtok(NULL, s);
                     printf("OUR %s\n", token);
                     // PUB849267388284682...
-                    
+                    strcat(msgReceived, token);                    
                     char* AlicePubKey = token;
                     char* initMessage = mpz_get_str(NULL, 16, myPubKey);
                     //printf("OUR KEY: %s\n", initMessage);
                     if (strcmp(&AlicePubKey[3], initMessage) == 0) {
                         printf("\n\nWas my pub key whoop\n\n");
                         // when pub key matches
-                        char* msgReceived;
-                        strcpy(msgReceived, BobPubKey);
-                        strcat(msgReceived, "\n");
-                        strcat(msgReceived, AlicePubKey);
+                        
                         token = strtok(NULL, s);
                         // signature
                         printf("No SEG yet\n");
