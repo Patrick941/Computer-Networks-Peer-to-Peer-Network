@@ -252,6 +252,7 @@ void * receiving(){
         socklen_t addr_len = sizeof(peer_addr);
         int n = recvfrom(sock, buffer, 4096, 0, (sockaddr *)&peer_addr, &addr_len);
         buffer[n] = '\0';
+        int boolSent = 0; //store boolean if already sent signature
 
         if (buffer[0] == 'K' && buffer[1] == 'E' && buffer[2] == 'Y') {
             if (strlen(buffer) < 1000) {
@@ -272,11 +273,27 @@ void * receiving(){
                 strcat(message, rsaEncrypt(hashSTR, rsaPrivKey, rsaPubKey));
 
                 printf("Sending the following message:\n%s\n", message);
+                boolSent = 1;
                 sendto(sock, message, strlen(message), 0, (sockaddr *)&peer_addr, sizeof(peer_addr));
 
             } else {
                 // contains 2 keys and a signature
-                printf("I JUST RECIEVED THIS:\n %s\n", buffer);
+                printf("I JUST RECIEVED THIS:\n%s\n", buffer);
+                char s[2] = "\n";
+                char* token;
+                if (boolSent) {
+                    //if already sent dont send a message just verify
+
+
+                } else {
+                    // verify and send signature back
+                    token = strtok(buffer, s);
+                    printf("%s\n", token);
+                    while (token!= NULL) {
+                        token = strtok(buffer, s);
+                        printf("%s\n", token);
+                    }
+                }
                 break;
             }
         }
