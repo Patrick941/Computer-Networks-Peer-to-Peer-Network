@@ -271,7 +271,8 @@ void * receiving(){
                 strcat(message, "\nSIG");
                 strcat(message, rsaEncrypt(hashSTR, rsaPrivKey, rsaPubKey));
 
-                printf("Sending the following message:\n %s\n", message);
+                printf("Sending the following message:\n%s\n", message);
+                sendto(sock, message, strlen(message), 0, (sockaddr *)&peer_addr, sizeof(peer_addr));
 
             } else {
                 // contains 2 keys and a signature
