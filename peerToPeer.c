@@ -271,6 +271,7 @@ void * receiving(){
                 
                 strcat(message, "\nSIG");
                 strcat(message, rsaEncrypt(hashSTR, rsaPrivKey, rsaPubKey));
+                strcat(message, "\n");
 
                 printf("Sending the following message:\n%s\n", message);
                 boolSent = 1;
