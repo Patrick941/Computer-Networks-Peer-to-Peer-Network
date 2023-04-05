@@ -278,7 +278,7 @@ void * receiving(){
 
             } else {
                 // contains 2 keys and a signature
-                printf("I JUST RECIEVED THIS:\n%s\n", buffer);
+                //printf("I JUST RECIEVED THIS:\n%s\n", buffer);
                 char s[2] = "\n";
                 char* token;
                 if (boolSent) {
@@ -293,17 +293,19 @@ void * receiving(){
                     char* BobPubKey = token;
 
                     token = strtok(NULL, s);
-                    printf("%s\n", token);
+                    printf("OUR %s\n", token);
                     // PUB849267388284682...
+                    
                     char* AlicePubKey = token;
                     char* initMessage = mpz_get_str(NULL, 16, myPubKey);
+                    printf("OUR KEY: %s\n", initMessage)
                     if (strcmp(&AlicePubKey[3], initMessage)) {
-                        printf("Was my pub key whoop\n");
+                        printf("\n\nWas my pub key whoop\n\n");
                     }
 
 
                     token = strtok(NULL, s);
-                    printf("%s\n", token);
+                    //printf("%s\n", token);
 
                 }
                 break;
