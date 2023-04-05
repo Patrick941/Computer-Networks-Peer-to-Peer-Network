@@ -9,9 +9,16 @@
 #include "diffie.h"
 #include "aesV4.h"
 #include "aesV4.c"
+#include "hash.h"
+#include "hash.c"
+#include "rsa.h"
+#include "rsa.c"
 
 #define PORT 3333
-#define messageSize 1025
+#define messageSize 4096
+
+char* rsaPrivKey = "";
+char* rsaPubKey = "";
 
 char ip[16];
 int firstMessage = 1;
@@ -40,7 +47,7 @@ typedef struct sockaddr sockaddr;
     int sock = 0, breakCondition = 0;
     sockaddr_in serv_addr, peer_addr;
     char message[messageSize];
-    char buffer[1024] = {0};
+    char buffer[4096] = {0}; // 4096 to allow 2 keys (1000*2ish) 1 signature (1000ish)
     char ack[20];
     mpz_t prime, generator, privKey, myPubKey, recievedPubKey, secretKey;
 // Run with:
@@ -238,10 +245,39 @@ void * receiving(){
     char ackNo[27];
     char tempKey[messageSize];
     while(1){
+        // RSA SIGNATURE ONCE THIS MESSAGE IS RECIEVED
+        // KEY:"010101010"YOURS:"01010101010011"SIGN:"0101010101000010"
+        //if statement, check if its got a signature or not first,
         // Wait until a message is received
         socklen_t addr_len = sizeof(peer_addr);
         int n = recvfrom(sock, buffer, 1024, 0, (sockaddr *)&peer_addr, &addr_len);
         buffer[n] = '\0';
+
+        if (buffer[0] == 'K' && buffer[1] == 'E' && buffer[2] == 'Y') {
+            if (strlen(buffer) < 1000) {
+                // contains just public key
+                strcpy(tempKey, &buffer[3]);
+                // tempKey = received public key
+                // we dont want to calc secret key yet for diffie because we dont know who sent it
+                strcpy(message, "KEY");
+                char * initMessage = mpz_get_str(NULL, 16, myPubKey);
+                strcat(message, initMessage);
+
+                strcat(message, "\nPUB");
+                strcat(message, tempKey);
+
+                char* hashSTR = sha256(message);
+                
+                strcat(message, "\nSIG");
+                strcat(message, rsaEncrypt(hashSTR, rsaPrivKey, rsaPubKey););
+
+                printf("Sending the following message:\n %s\n", mesaage);
+
+            } else {
+                // contains 2 keys and a signature
+            }
+        }
+
         // Check if the message is a key
         if(buffer[0] == 'K' && buffer[1] == 'E' && buffer[2] == 'Y'){
             // Parse public key and use it to calculate secretKey
