@@ -287,7 +287,7 @@ void * receiving(){
 
                 } else {
                     // verify and send signature back
-                    char* msgReceived
+                    char* msgReceived;
 
                     token = strtok(buffer, s);
                     printf("%s\n", token);
