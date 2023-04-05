@@ -244,6 +244,7 @@ void * receiving(){
     char temp[30];
     char ackNo[27];
     char tempKey[messageSize];
+    char msgReceived[messageSize];
     while(1){
         // RSA SIGNATURE ONCE THIS MESSAGE IS RECIEVED
         // KEY:"010101010"YOURS:"01010101010011"SIGN:"0101010101000010"
@@ -288,7 +289,6 @@ void * receiving(){
 
                 } else {
                     // verify and send signature back
-                    char* msgReceived;
 
                     token = strtok(buffer, s);
                     printf("%s\n", token);
