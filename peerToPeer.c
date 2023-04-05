@@ -151,7 +151,7 @@ void * sending(){
         // Prevent print statement running twice when creating connection
         if(firstMessage != 1){
             pthread_mutex_lock(&lock);
-            //printf("Message %s:%i: ", ip, PORT);
+            printf("Message %s:%i: ", ip, PORT);
             pthread_mutex_unlock(&lock);
         }
         fflush(stdout);
