@@ -304,7 +304,8 @@ void * receiving(){
                     char* AlicePubKey = token;
                     char* initMessage = mpz_get_str(NULL, 16, myPubKey);
                     //printf("OUR KEY: %s\n", initMessage);
-                    if (strcmp(&AlicePubKey[3], initMessage) == 0) {
+                    printf("No SEG yet\n");
+                    if (strcmp(&token[3], initMessage) == 0) {
                         printf("\n\nWas my pub key whoop\n\n");
                         // when pub key matches
                         
