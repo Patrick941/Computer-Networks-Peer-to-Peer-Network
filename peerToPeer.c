@@ -147,9 +147,11 @@ int main(int argc, char const *argv[]) {
 
                 int result;
                 // Create a thread for receiving and create a thread for sending
-                for(int i = 0; i < IPamount; i++){
+                for(int i = 0; i < USER_MAX; i++){
+                    //printf("Before mallocs\n");
                     int *argI = (int *) malloc(sizeof(int)); 
                     *argI = i;
+                    //printf("Attempting to create thread\n");
                     result = pthread_create(&groupReceiving[i], NULL, groupReceivingFunc, argI);
                     if (result != 0) {
                         perror("Thread creation failed");
@@ -163,7 +165,7 @@ int main(int argc, char const *argv[]) {
                 }
 
                 // Wait for the threads to complete
-                for(int i = 0; i < IPamount; i++){
+                for(int i = 0; i < USER_MAX; i++){
                     result = pthread_join(groupReceiving[i], NULL);
                     if(result != 0) {
                         perror("Thread join failed");
@@ -418,8 +420,14 @@ void getIPandPort(){
     scanf("%15s", ip);
 }
 
+char *ip2 = "127.0.0.1";
+char *ip3 = "127.0.0.1";
 
 void* groupSendingFunc() {
+    strcpy(receivers[0].destinationIP, ip0);
+    strcpy(receivers[1].destinationIP, ip1);
+    strcpy(receivers[2].destinationIP, ip2);
+    strcpy(receivers[3].destinationIP, ip3);
     int result;
     int joinedState[USER_MAX];
     for(int i = 0; i < IPamount; i ++){
@@ -462,17 +470,37 @@ void* groupReceivingFunc(void* arg) {
     socklen_t addr_len = sizeof(peer_addr);
     if(userGroupState == 2){
         for(;;){
+            //printf("loop entered");
             if(breakCondition == 0){
                 for (int i = 0; i < USER_MAX; i++) {
                     int n = recvfrom(receivers[i].socket, buffer, 4096, 0, (sockaddr*)&peer_addr, &addr_len);
                     if(n > 0){
-                        if(buffer[0] == '~'&& buffer[1] == '~' && buffer[2] == 'J' && buffer[3] == 'O' && buffer[4] == 'I' && buffer[5] == 'N'){
-                            char IPaddress[20];
-                            strcpy(IPaddress, &buffer[6]);
-                            printf("Request to join from %s", IPaddress);
-                            breakCondition = 1;
+                        if(strlen(buffer) >= 6){
+                            if(buffer[0] == '~'&& buffer[1] == '~' && buffer[2] == 'J' && buffer[3] == 'O' && buffer[4] == 'I' && buffer[5] == 'N'){
+                                char IPaddress[20];
+                                strcpy(IPaddress, &buffer[6]);
+                                printf("Request to join from %s\n", IPaddress);
+                                // Set address family and port
+                                peer_addr.sin_family = AF_INET;
+                                peer_addr.sin_port = htons(PORT);
+
+                                // Convert ip to binary and check it is supported by the given family
+                                if (inet_pton(AF_INET, IPaddress, &peer_addr.sin_addr) <= 0) {
+                                    printf("\n Invalid address/ Address not supported \n");
+                                    return NULL;
+                                }
+                                sprintf(message, "~~ILLJOIN%s", myIP);
+                                int result = sendto(receivers[i].socket, message, strlen(message), 0, (sockaddr*)&peer_addr, sizeof(peer_addr));
+                                if (result == -1) {
+                                    perror("Error sending message");
+                                    exit(1);
+                                }
+                                breakCondition = 1;
+                            } else{
+                                printf("%s is of wrong format\n");
+                            } 
                         } else{
-                            printf("%s is of wrong format\n");
+                        printf("%s is of wrong format\n");
                         }
                     }
                 }
@@ -483,11 +511,38 @@ void* groupReceivingFunc(void* arg) {
     
     int n;
     for (;;) {
+        char IPaddress[20];
+        int receivedWithinLoop = 0;
         for (int i = 0; i < IPamount; i++) {
             n = recvfrom(receivers[i].socket, buffer, 4096, MSG_DONTWAIT, (sockaddr*)&peer_addr, &addr_len);
             if (n > 0) {
-                buffer[n] = '\0';
-                printf("%s\n", buffer);
+                if(strlen(buffer) >= 9){
+                    if(buffer[0] == '~' && buffer[1] == '~' && buffer[2] == 'I' && buffer[3] == 'L' && buffer[4] == 'L' && buffer[5] == 'J' && buffer[6] == 'O' && buffer[7] == 'I' && buffer[8] == 'N'){
+                        strcpy(IPaddress, &buffer[9]);
+                        receivedWithinLoop = 1;
+                    } else {
+                        buffer[n] = '\0';
+                        printf("%s\n", buffer);
+                    }
+                } else {
+                    buffer[n] = '\0';
+                    printf("%s\n", buffer);
+                }
+            }
+        }
+        if(receivedWithinLoop == 1){
+            for (int i = 0; i < IPamount; i++) {
+                if(strcmp(receivers[i].destinationIP, IPaddress) == 0){
+                    printf("Addresses match, sending address list\n");
+                    for(int j = 0; j < IPamount; j++){
+                        sprintf(message, "ADD%s", receivers[i].destinationIP);
+                        int result = sendto(receivers[i].socket, message, strlen(message), 0, (sockaddr*)&peer_addr, sizeof(peer_addr));
+                        if (result == -1) {
+                            perror("Error sending message");
+                            exit(1);
+                        }
+                    }
+                }
             }
         }
         usleep(100);
