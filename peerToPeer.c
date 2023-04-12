@@ -16,6 +16,7 @@
 
 #define PORT 3333
 #define messageSize 4096
+#define USER_MAX 4
 
 char* rsaPrivKey = "83687677931c16a51794628acc0c73178e282635f670ae1257d7d67cafcb5a2651b8aa600e09fdbf10402ec02fcef915c6cc950ee113ab3c13c1456faf77601d5ceeeb3f4ad01d9e41a3d4943fb2ff89b9f02ab7793b3204c1026597f90da63bfd51e87c70d998d492ce00dbde5dceebd0c9c7acfd3fda89242b9c4633b28ed2b5159592572d27171998569e87f1c9e6fecf89bb306addbedd2e0c9f19bef74c78141d2c14848bdb1ab71b0bf969a26735ad93d45493f852d31a2bea8e57f07d3782006cc497de0f37cb8f363ad5e8cb55f2d7ed263321effba9fb43d2acd4801bc9aa15798b6be0b44bd86880dd5a3f871e6c644307d02e4b60da746f287db6e14a1e5988d9212e2c2d626618b4e7ea5fe5c4232238aafac314cf6ad9524f279c3622e3f0bcc52da3215af939f9b503507249f81473299a5ef03a83a853a111bbc4ce0b28852733d208f9b857028f61cf05e6ad461e003feb84d208c2b7f8a155a87f297deb5ffc9e0467647bfcf3147974e1a3a28f47d3613cd1c5300909adbc5c33c35bd3cee114ad227deafde4d0b3927eb53d0fba86fffaac10045c4f8b9c9e6248422935017906c4933a7a1df005297786ca61ffda82508c242671b6b570831ed8b66062e349dba8684f7a70d0b48c487019a82cba59dd983db98b87d9b59909c719c72dee1677808e24a98eabb242418aac3291a5a3d16991080c159";
 char* rsaPubKey = "bc1b51e0c075f8589b0d5073f07ef25f913d72b652bca1361eddda9e164f88d75d7aee87c14bcdd68e19bfd25d51ab9510d0e0fafc2f1af7830bec1f2398aff5dfb73886d04e54587fe712eab402f8704998920176f7057396f0bb93e54db98b3bdb8217253eee7e6112c4e3f9e74240b17100cdcc597c978665eff09c9d17daf03a4d3831b1fcd06fa65b53a8b4af9a539053e3a10b392672883b85fb75c25dc47f5c7546c10344e5b1560b3dde6a751f3bc40be0fac12916e458153749706732ce73d6fc5a2c786e5396bb40690d8597cbc8f4cfda339b009bfa266cd3c85b91cf8dbf6a3d5ec012800496496d92d2ccb2643a42dd5de95447004ad8d04d9b72316ef8f67abed88f336cb323f94a2042bbe6fb1290fe8d3c38ae16b037d47755f37962e2e5294d1f33cfe7ce58b2b6bd95868493550cb5dba4029312fcc381a026baf74746b1817c327817f4e6c49fa8c6ad7dbc33a18b5a7af1a471c605cf0f2a804c7b8ef7eb248f79b3d00e5922ebfaac2829167b2326ed5c990d50d51d18f6b67db1bc487650fb89a37daafd54c4f1dd9b420958587ece9ceb006eb2bb82ba06f9df64fe0911784dd1422441749939a26071180d00851e64d5d4b375264970560e673d0d52e7a9408e555304bdce1eb5a7894b40bd72f98684538d78c7426ce3c51bda35f0219d73ee74aebb5f31fef355ea7e23b2b355331158b621b";
@@ -42,17 +43,39 @@ typedef struct sockaddr_in sockaddr_in;
 typedef struct sockaddr sockaddr;
 
 // Decleration of variables
-    pthread_t sendingThread;
-    pthread_t receivingThread;
-    int sock = 0, breakCondition = 0;
-    sockaddr_in serv_addr, peer_addr;
-    char message[messageSize];
-    char buffer[4096] = {0}; // 4096 to allow 2 keys (1000*2ish) 1 signature (1000ish)
-    char ack[20];
-    mpz_t prime, generator, privKey, myPubKey, recievedPubKey, secretKey;
+pthread_t sendingThread;
+pthread_t receivingThread;
+int sock = 0, breakCondition = 0;
+sockaddr_in serv_addr, peer_addr;
+char message[messageSize];
+char buffer[4096] = {0}; // 4096 to allow 2 keys (1000*2ish) 1 signature (1000ish)
+char ack[20];
+mpz_t prime, generator, privKey, myPubKey, recievedPubKey, secretKey;
 // Run with:
 // gcc peerToPeer.c -pthread -lgmp
 // ./a.out
+int mode = 0;
+
+int userGroupState;
+
+typedef struct destinationUsers destinationUsers;
+struct destinationUsers{
+    char destinationIP[10];
+    int socket;
+};
+destinationUsers receivers[USER_MAX];
+char nick[200];
+int IPamount;
+
+pthread_t groupReceiving[USER_MAX];
+pthread_t groupSending;
+
+void * groupSendingFunc();
+void * groupReceivingFunc(void * argI);
+
+char *myIP = "192.168.1.40";
+char *ip0 = "192.168.1.39";
+char *ip1 = "127.0.0.1";
 
 int main(int argc, char const *argv[]) {
 
@@ -60,80 +83,416 @@ int main(int argc, char const *argv[]) {
     // strcpy(message, "Hello World\n");
     // strcpy(ip, "192.168.1.39");
 
-    diffieInit(prime, generator, privKey, myPubKey, recievedPubKey, secretKey);
-    genPrivKey(privKey);
-    calcPubKey(privKey, generator, prime, myPubKey);
+    /// re prompt
+    promptUser:
 
-
-    // Read Ip from user input
-    getIPandPort();
-
-    // Create UDP socket
-    if ((sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
-        printf("\n Socket creation error \n");
-        return -1;
-    }
+    printf("Select service:\n~1  Private messaging\n~2  Group messaging\n~3  Video Calling (WILL NOT WORK ON RASPBERRY PIs)\n");
     
-    
-    // Set server family, socket structure and port
-    serv_addr.sin_family = AF_INET;
-    serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    serv_addr.sin_port = htons(PORT);
+    char userInput[10];
+    scanf("%9s", userInput);
 
-    // Bind socket
-    if (bind(sock, (sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
-        printf("\n Bind failed \n");
-        return -1;
+    /// parse input
+    if(userInput[0] == '~' && userInput[1] == '1'){
+        mode = 1;
+    } else if(userInput[0] == '~' && userInput[1] == '2'){
+        mode = 2;
+    } else if(userInput[0] == '~' && userInput[1] == '3'){
+        mode = 3;
+    } else {
+        printf("No valid option was given, try again\n");
+        goto promptUser;
     }
 
-    // Set address family and port
-    peer_addr.sin_family = AF_INET;
-    peer_addr.sin_port = htons(PORT);
+    /// setup group
+    if(mode == 3){
+        printf("Video calling will not work on the raspberry pi, try again\n");
+        goto promptUser;
+    } else if (mode == 2){
+        printf("How do you want to appear to other users? (Nick name)\n");
+        scanf("%199s", nick);
+        stateSelect:
+        printf("Do you want to create the groupchat or allow another person to create one with you in it?\n    ~1     Create your own groupchat\n    ~2    Join a groupchat\n");
+        char userState[200];
+        scanf("%s", userState);
+        if(userState[0] == '~'){
+            if(userState[1] == '1') userGroupState = 1; 
+            else if(userState[1] == '2'){
+                userGroupState = 2;
+                printf("Waiting to be added to groupchat\n");
 
-    // Convert ip to binary and check it is supported by the given family
-    if (inet_pton(AF_INET, ip, &peer_addr.sin_addr) <= 0) {
-        printf("\n Invalid address/ Address not supported \n");
-        return -1;
-    }
 
-    printf("'~1' to change ip\n'~2' to quit\nMax message length of %i characters\n", messageSize - 100);
+                for(int i = 0; i < USER_MAX; i++){
+                    // Create UDP socket
+                    if ((receivers[i].socket = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+                        printf("\n Socket creation error \n");
+                        return -1;
+                    }
 
-    // Create a thread for receiving and create a thread for sending
-    int result = pthread_create(&receivingThread, NULL, receiving, NULL);
-    if (result != 0) {
-        perror("Thread creation failed");
-        return 1;
-    }
-    result = pthread_create(&sendingThread, NULL, sending, NULL);
-    if (result != 0) {
-        perror("Thread creation failed");
-        return 1;
-    }
-    
-    // Wait for threads to finish and join them
-    result = pthread_join(receivingThread, NULL);
-    if (result != 0) {
-        perror("Thread join failed");
-        return 1;
-    }
-    result = pthread_join(sendingThread, NULL);
-    if (result != 0) {
-        perror("Thread join failed");
-        return 1;
-    }
+                    // Set server family, socket structure and port
+                    serv_addr.sin_family = AF_INET;
+                    serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+                    serv_addr.sin_port = htons(PORT + i);
 
-    // Close socket
-    close(sock);
-    
-    // Destroy Mutex
-    pthread_mutex_destroy(&lock);
+                    // Bind socket
+                    if (bind(receivers[i].socket, (sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
+                        printf("\n Bind failed \n");
+                        return -1;
+                    }
 
-    return 0;
+                    printf("Socket is %i\n", receivers[i].socket);
+
+                }
+                printf("All sockets opened\n");
+
+
+                int result;
+                // Create a thread for receiving and create a thread for sending
+                for(int i = 0; i < IPamount; i++){
+                    int *argI = (int *) malloc(sizeof(int)); 
+                    *argI = i;
+                    result = pthread_create(&groupReceiving[i], NULL, groupReceivingFunc, argI);
+                    if (result != 0) {
+                        perror("Thread creation failed");
+                        return 1;
+                    }
+                }
+                result = pthread_create(&groupSending, NULL, groupSendingFunc, NULL);
+                if (result != 0) {
+                    perror("Thread creation failed");
+                    return 1;
+                }
+
+                // Wait for the threads to complete
+                for(int i = 0; i < IPamount; i++){
+                    result = pthread_join(groupReceiving[i], NULL);
+                    if(result != 0) {
+                        perror("Thread join failed");
+                        return 1;
+                    }
+                }
+                result = pthread_join(groupSending, NULL);
+                if(result != 0) {
+                    perror("Thread join failed");
+                    return 1;
+                }
+                return 0;
+            } else{
+                printf("Valid option not selected, try again\n");
+                goto stateSelect;
+            }
+        }
+        else{
+            printf("Valid option not selected, try again\n");
+            goto stateSelect;
+        }
+        printf("Max user count is %i\n", USER_MAX);
+
+        // flush stdin wasnt working
+        int c;
+        while ((c = getchar()) != '\n' && c != -1);
+        int i  = 1;
+        IPamount = 1;
+        printf("Give the first IP address you want to create a group chat with\n");
+        scanf("%19s", receivers[0].destinationIP);
+
+        // Create UDP socket
+        if ((receivers[0].socket = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+            printf("\n Socket creation error \n");
+            return -1;
+        }
+
+        printf("Socket is %i\n", receivers[0].socket);
+
+        //printf("Socket creation successs\n");
+        // Set server family, socket structure and port
+        serv_addr.sin_family = AF_INET;
+        serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+        serv_addr.sin_port = htons(PORT);
+
+        // Bind socket
+        if (bind(receivers[0].socket, (sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
+            printf("\n Bind failed \n");
+            return -1;
+        }
+
+        //printf("Bind success\n");
+
+        // Set address family and port
+        peer_addr.sin_family = AF_INET;
+        peer_addr.sin_port = htons(PORT);
+
+        // Convert ip to binary and check it is supported by the given family
+        if (inet_pton(AF_INET, ip0, &peer_addr.sin_addr) <= 0) {
+            printf("Invalid address/ Address not supported \n");
+            printf("Ignoring Ip address and prompting again\n");
+            goto anotherIP;
+        }
+        printf("%s was added successfully\n",receivers[0].destinationIP);
+        anotherIP:
+        printf("Give another IP address and if you don't want to add anymore, type '~'\n");
+        if(i < USER_MAX){
+            scanf("%s", receivers[i].destinationIP);
+            if(receivers[i].destinationIP[0] == '~' || i == USER_MAX){
+                printf("Users added, creating group chat\n");
+
+                int result;
+                // Create a thread for receiving and create a thread for sending
+                for(int i = 0; i < IPamount; i++){
+                    int *argI = (int *) malloc(sizeof(int)); 
+                    *argI = i;
+                    result = pthread_create(&groupReceiving[i], NULL, groupReceivingFunc, argI);
+                    if (result != 0) {
+                        perror("Thread creation failed");
+                        return 1;
+                    }
+                }
+                result = pthread_create(&groupSending, NULL, groupSendingFunc, NULL);
+                if (result != 0) {
+                    perror("Thread creation failed");
+                    return 1;
+                }
+
+                // Wait for the threads to complete
+                for(int i = 0; i < IPamount; i++){
+                    result = pthread_join(groupReceiving[i], NULL);
+                    if(result != 0) {
+                        perror("Thread join failed");
+                        return 1;
+                    }
+                }
+                result = pthread_join(groupSending, NULL);
+                if(result != 0) {
+                    perror("Thread join failed");
+                    return 1;
+                }
+                return 0;
+            }
+
+            // Create UDP socket
+            if ((receivers[i].socket = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+                printf("\n Socket creation error \n");
+                return -1;
+            }
+
+
+            // Set server family, socket structure and port
+            serv_addr.sin_family = AF_INET;
+            serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+            serv_addr.sin_port = htons(PORT + i);
+
+            // Bind socket
+            if (bind(receivers[i].socket, (sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
+                printf("\n Bind failed \n");
+                return -1;
+            }
+
+            printf("Socket is %i\n", receivers[i].socket);
+
+            // Set address family and port
+            peer_addr.sin_family = AF_INET;
+            peer_addr.sin_port = htons(PORT + i);
+
+            
+
+            // Convert ip to binary and check it is supported by the given family
+            if (inet_pton(AF_INET, ip1, &peer_addr.sin_addr) <= 0) {
+                printf("Invalid address/ Address not supported \n");
+                printf("Ignoring Ip address and prompting again\n");
+                goto anotherIP;
+            }
+            printf("%s was added successfully\n", receivers[i].destinationIP);
+            i++;
+            IPamount++;
+            goto anotherIP;
+        } else {
+            if(receivers[i].destinationIP[0] == '~' || i == USER_MAX){
+                printf("Users added, creating group chat\n");
+
+                int result;
+                // Create a thread for receiving and create a thread for sending
+                for(int i = 0; i < IPamount; i++){
+                    int *argI = (int *) malloc(sizeof(int)); 
+                    *argI = i;
+                    result = pthread_create(&groupReceiving[i], NULL, groupReceivingFunc, argI);
+                    if (result != 0) {
+                        perror("Thread creation failed");
+                        return 1;
+                    }
+                }
+                result = pthread_create(&groupSending, NULL, groupSendingFunc, NULL);
+                if (result != 0) {
+                    perror("Thread creation failed");
+                    return 1;
+                }
+
+                // Wait for the threads to complete
+                for(int i = 0; i < IPamount; i++){
+                    result = pthread_join(groupReceiving[i], NULL);
+                    if(result != 0) {
+                        perror("Thread join failed");
+                        return 1;
+                    }
+                }
+                result = pthread_join(groupSending, NULL);
+                if(result != 0) {
+                    perror("Thread join failed");
+                    return 1;
+                }
+            }
+        }
+    } else if(mode == 1){
+        diffieInit(prime, generator, privKey, myPubKey, recievedPubKey, secretKey);
+        genPrivKey(privKey);
+        calcPubKey(privKey, generator, prime, myPubKey);
+
+
+        // Read Ip from user input
+        getIPandPort();
+
+        // Create UDP socket
+        if ((sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+            printf("\n Socket creation error \n");
+            return -1;
+        }
+
+
+        // Set server family, socket structure and port
+        serv_addr.sin_family = AF_INET;
+        serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+        serv_addr.sin_port = htons(PORT);
+
+        // Bind socket
+        if (bind(sock, (sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
+            printf("\n Bind failed \n");
+            return -1;
+        }
+
+        // Set address family and port
+        peer_addr.sin_family = AF_INET;
+        peer_addr.sin_port = htons(PORT);
+
+        // Convert ip to binary and check it is supported by the given family
+        if (inet_pton(AF_INET, ip, &peer_addr.sin_addr) <= 0) {
+            printf("\n Invalid address/ Address not supported \n");
+            return -1;
+        }
+
+        printf("'~1' to change ip\n'~2' to quit\nMax message length of %i characters\n", messageSize - 100);
+
+        // Create a thread for receiving and create a thread for sending
+        int result = pthread_create(&receivingThread, NULL, receiving, NULL);
+        if (result != 0) {
+            perror("Thread creation failed");
+            return 1;
+        }
+        result = pthread_create(&sendingThread, NULL, sending, NULL);
+        if (result != 0) {
+            perror("Thread creation failed");
+            return 1;
+        }
+
+        // Wait for threads to finish and join them
+        result = pthread_join(receivingThread, NULL);
+        if (result != 0) {
+            perror("Thread join failed");
+            return 1;
+        }
+        result = pthread_join(sendingThread, NULL);
+        if (result != 0) {
+            perror("Thread join failed");
+            return 1;
+        }
+
+        // Close socket
+        close(sock);
+
+        // Destroy Mutex
+        pthread_mutex_destroy(&lock);
+
+        return 0;
+    }
 }
 
 void getIPandPort(){
     printf("What is your destination IP?\n");
     scanf("%15s", ip);
+}
+
+
+void* groupSendingFunc() {
+    int result;
+    int joinedState[USER_MAX];
+    for(int i = 0; i < IPamount; i ++){
+        joinedState[i] = 0;
+    }
+    for (;;) {
+        if(userGroupState == 1){
+            int finished = 1;
+            // Get ACK from other nodes and once connection is established send the user list
+            for(int i = 0; i < IPamount; i++){
+                if(joinedState[i] == 0){
+                    finished = 0;
+                    sprintf(message, "~~JOIN%s", myIP);
+                    printf("sending: %s\n", message);
+                    result = sendto(receivers[i].socket, message, strlen(message), 0, (sockaddr*)&peer_addr, sizeof(peer_addr));
+                    if (result == -1) {
+                        perror("Error sending message");
+                        exit(1);
+                    }
+                }
+            }
+        }
+        fgets(message, sizeof(message), stdin);
+        // Remove the trailing newline character from the message
+        message[strcspn(message, "\n")] = '\0';
+        for (int i = 0; i < IPamount; i++) {
+            result = sendto(receivers[i].socket, message, strlen(message), 0, (sockaddr*)&peer_addr, sizeof(peer_addr));
+            //printf("Sending %s to %i\n", message, receivers[i].socket);
+            if (result == -1) {
+                perror("Error sending message");
+                exit(1);
+            }
+        }
+    }
+    return NULL;
+}
+
+
+void* groupReceivingFunc(void* arg) {
+    socklen_t addr_len = sizeof(peer_addr);
+    if(userGroupState == 2){
+        for(;;){
+            if(breakCondition == 0){
+                for (int i = 0; i < USER_MAX; i++) {
+                    int n = recvfrom(receivers[i].socket, buffer, 4096, 0, (sockaddr*)&peer_addr, &addr_len);
+                    if(n > 0){
+                        if(buffer[0] == '~'&& buffer[1] == '~' && buffer[2] == 'J' && buffer[3] == 'O' && buffer[4] == 'I' && buffer[5] == 'N'){
+                            char IPaddress[20];
+                            strcpy(IPaddress, &buffer[6]);
+                            printf("Request to join from %s", IPaddress);
+                            breakCondition = 1;
+                        } else{
+                            printf("%s is of wrong format\n");
+                        }
+                    }
+                }
+            }
+        }
+    }
+    int index = *((int*)arg);
+    
+    int n;
+    for (;;) {
+        for (int i = 0; i < IPamount; i++) {
+            n = recvfrom(receivers[i].socket, buffer, 4096, MSG_DONTWAIT, (sockaddr*)&peer_addr, &addr_len);
+            if (n > 0) {
+                buffer[n] = '\0';
+                printf("%s\n", buffer);
+            }
+        }
+        usleep(100);
+    }
+    return NULL;
 }
 
 
