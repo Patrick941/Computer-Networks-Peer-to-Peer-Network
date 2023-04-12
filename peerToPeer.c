@@ -74,7 +74,7 @@ pthread_t groupSending;
 void * groupSendingFunc();
 void * groupReceivingFunc(void * argI);
 
-char *myIP = "192.168.1.39";
+char *myIP = "192.168.1.40";
 char *ip0 = "192.168.1.39";
 char *ip1 = "127.0.0.1";
 
@@ -604,6 +604,8 @@ void* groupReceivingFunc(void* arg) {
                     if(buffer[0] == '~' && buffer[1] == '~' && buffer[2] == 'I' && buffer[3] == 'L' && buffer[4] == 'L' && buffer[5] == 'J' && buffer[6] == 'O' && buffer[7] == 'I' && buffer[8] == 'N'){
                         strcpy(IPaddress, &buffer[9]);
                         receivedWithinLoop = 1;
+                    } else if(buffer[0] == '~' && buffer[1] == '~'){
+                        
                     } else {
                         buffer[n] = '\0';
                         printf("%s\n", buffer);
