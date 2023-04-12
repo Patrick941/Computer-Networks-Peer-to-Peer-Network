@@ -62,6 +62,7 @@ typedef struct destinationUsers destinationUsers;
 struct destinationUsers{
     char destinationIP[10];
     int socket;
+    int validated;
 };
 destinationUsers receivers[USER_MAX];
 char nick[200];
@@ -73,7 +74,7 @@ pthread_t groupSending;
 void * groupSendingFunc();
 void * groupReceivingFunc(void * argI);
 
-char *myIP = "192.168.1.40";
+char *myIP = "192.168.1.39";
 char *ip0 = "192.168.1.39";
 char *ip1 = "127.0.0.1";
 
@@ -82,6 +83,11 @@ int main(int argc, char const *argv[]) {
     // Can be hardcoded to make testing faster
     // strcpy(message, "Hello World\n");
     // strcpy(ip, "192.168.1.39");
+
+    for(int i = 0; i < USER_MAX; i++){
+        receivers[i].socket = -1;
+        receivers[i].validated = 0;
+    }
 
     /// re prompt
     promptUser:
@@ -424,16 +430,17 @@ char *ip2 = "127.0.0.1";
 char *ip3 = "127.0.0.1";
 
 void* groupSendingFunc() {
-    strcpy(receivers[0].destinationIP, ip0);
-    strcpy(receivers[1].destinationIP, ip1);
-    strcpy(receivers[2].destinationIP, ip2);
-    strcpy(receivers[3].destinationIP, ip3);
+    //strcpy(receivers[0].destinationIP, ip0);
+    //strcpy(receivers[1].destinationIP, ip1);
+    //strcpy(receivers[2].destinationIP, ip2);
+    //s/trcpy(receivers[3].destinationIP, ip3);
     int result;
     int joinedState[USER_MAX];
-    for(int i = 0; i < IPamount; i ++){
+    for(int i = 0; i < USER_MAX; i ++){
         joinedState[i] = 0;
     }
     for (;;) {
+        printf("Group sending function entered\n");
         if(userGroupState == 1){
             int finished = 1;
             // Get ACK from other nodes and once connection is established send the user list
@@ -453,67 +460,141 @@ void* groupSendingFunc() {
         fgets(message, sizeof(message), stdin);
         // Remove the trailing newline character from the message
         message[strcspn(message, "\n")] = '\0';
-        for (int i = 0; i < IPamount; i++) {
-            result = sendto(receivers[i].socket, message, strlen(message), 0, (sockaddr*)&peer_addr, sizeof(peer_addr));
-            //printf("Sending %s to %i\n", message, receivers[i].socket);
-            if (result == -1) {
-                perror("Error sending message");
-                exit(1);
+        for (int i = 0; i < USER_MAX; i++) {
+            if(receivers[i].socket >= 3 && receivers[i].validated == 1){ 
+                if(strcmp(message,"") == 0 || message == NULL){
+                    break;
+                }
+                printf("Sending message: %s\n");    
+                result = sendto(receivers[i].socket, message, strlen(message), 0, (sockaddr*)&peer_addr, sizeof(peer_addr));
+                //printf("Sending %s to %i\n", message, receivers[i].socket);
+                
+                if (result == -1) {
+                    printf("Message couldn't send\n");
+                }
+            } else {
+                //printf("Invalid socket\n");
             }
         }
     }
     return NULL;
 }
 
+pthread_mutex_t channelSelector;
 
 void* groupReceivingFunc(void* arg) {
     socklen_t addr_len = sizeof(peer_addr);
     if(userGroupState == 2){
         for(;;){
+            //printf("in this loop still\n");
+            if(userGroupState != 2 | breakCondition == 1){
+                break;
+            }
             //printf("loop entered");
             if(breakCondition == 0){
                 for (int i = 0; i < USER_MAX; i++) {
-                    int n = recvfrom(receivers[i].socket, buffer, 4096, 0, (sockaddr*)&peer_addr, &addr_len);
+                    if(userGroupState != 2 | breakCondition == 1){
+                        break;
+                    }
+                    //printf("Looking for offers to join\n");
+                    pthread_mutex_lock(&channelSelector);
+                    int n = recvfrom(receivers[i].socket, buffer, 4096, MSG_DONTWAIT, (sockaddr*)&peer_addr, &addr_len);
                     if(n > 0){
+                        buffer[n] = '\0';
                         if(strlen(buffer) >= 6){
                             if(buffer[0] == '~'&& buffer[1] == '~' && buffer[2] == 'J' && buffer[3] == 'O' && buffer[4] == 'I' && buffer[5] == 'N'){
                                 char IPaddress[20];
                                 strcpy(IPaddress, &buffer[6]);
-                                printf("Request to join from %s\n", IPaddress);
+                                //printf("Request to join from %s\n", IPaddress);
+                                if(userGroupState == 0){
+                                    //printf("unlockingmutex\n");
+                                    pthread_mutex_unlock(&channelSelector);
+                                    break;
+                                }
                                 // Set address family and port
                                 peer_addr.sin_family = AF_INET;
                                 peer_addr.sin_port = htons(PORT);
 
                                 // Convert ip to binary and check it is supported by the given family
                                 if (inet_pton(AF_INET, IPaddress, &peer_addr.sin_addr) <= 0) {
-                                    printf("\n Invalid address/ Address not supported \n");
+                                    //printf("\n Invalid address/ Address not supported \n");
                                     return NULL;
                                 }
                                 sprintf(message, "~~ILLJOIN%s", myIP);
+                                receivers[i].validated = 1;
                                 int result = sendto(receivers[i].socket, message, strlen(message), 0, (sockaddr*)&peer_addr, sizeof(peer_addr));
                                 if (result == -1) {
                                     perror("Error sending message");
                                     exit(1);
+                                } else {
+                                    //printf("ILLJOIN message sent\n");
+                                }
+                                for(;;){
+                                    int n = recvfrom(receivers[i].socket, buffer, 4096, 0, (sockaddr*)&peer_addr, &addr_len);
+                                    buffer[n] = '\0';
+                                    char amount[20];
+                                    strcpy(amount, &buffer[3]);
+                                    IPamount = atoi(amount);
+                                    printf("%i\n", IPamount);
+                                    for(int j = 0; j < IPamount; j++){
+                                        if(j != i){
+                                            receivers[j].validated = 1;
+                                            int n = recvfrom(receivers[i].socket, buffer, 4096, 0, (sockaddr*)&peer_addr, &addr_len);
+                                            buffer[n] = '\0';
+                                            char currentAddress[20];
+                                            strcpy(receivers[i].destinationIP, &currentAddress[3]);
+                                            char IPaddress[20];
+                                            
+                                            
+                                            strcpy(IPaddress, &buffer[3]);
+                                            //printf("Adding to user list at index %i: %s\n", i, IPaddress);
+                                            // Set address family and port
+                                            peer_addr.sin_family = AF_INET;
+                                            peer_addr.sin_port = htons(PORT + i);
+
+                                            // Convert ip to binary and check it is supported by the given family
+                                            if (inet_pton(AF_INET, IPaddress, &peer_addr.sin_addr) <= 0) {
+                                                printf("\n Invalid address/ Address not supported \n");
+                                                return NULL;
+                                            }
+                                        }
+                                        
+                                    }
+                                    //printf("all addresses added\n");
+                                    userGroupState = 0;
+                                    if(userGroupState == 0){
+                                        //printf("unlockingmutex\n");
+                                        pthread_mutex_unlock(&channelSelector);
+                                        break;
+                                    }
                                 }
                                 breakCondition = 1;
                             } else{
-                                printf("%s is of wrong format\n");
+                                //printf("%s is of wrong format\n");
                             } 
                         } else{
-                        printf("%s is of wrong format\n");
+                            //printf("%s is of wrong format\n");
                         }
+                        
                     }
+                    pthread_mutex_unlock(&channelSelector);
                 }
+            } else {
+                break;
             }
         }
     }
+    
+    printf("exited the big set-up loop\n");
     int index = *((int*)arg);
     
     int n;
     for (;;) {
         char IPaddress[20];
         int receivedWithinLoop = 0;
-        for (int i = 0; i < IPamount; i++) {
+        //printf("Waiting for messages\n");
+        for (int i = 0; i < USER_MAX; i++) {
+            //printf("Waiting for messages\n");
             n = recvfrom(receivers[i].socket, buffer, 4096, MSG_DONTWAIT, (sockaddr*)&peer_addr, &addr_len);
             if (n > 0) {
                 if(strlen(buffer) >= 9){
@@ -529,6 +610,7 @@ void* groupReceivingFunc(void* arg) {
                     printf("%s\n", buffer);
                 }
             }
+            
         }
         if(receivedWithinLoop == 1){
             for (int i = 0; i < IPamount; i++) {
@@ -547,6 +629,7 @@ void* groupReceivingFunc(void* arg) {
         }
         usleep(100);
     }
+    printf("returning to main from a groupReceiving rthread\n");
     return NULL;
 }
 
@@ -875,6 +958,6 @@ void * receiving(){
                 }
                 free(decryptedBuffer);
             }
-        }        
-    }
-}
+        }   
+     }
+ }
