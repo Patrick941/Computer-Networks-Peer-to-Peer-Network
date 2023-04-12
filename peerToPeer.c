@@ -14,7 +14,7 @@
 #include "rsa.h"
 #include "rsa.c"
 
-#define PORT 3333
+#define PORT 33333
 #define messageSize 4096
 #define USER_MAX 4
 
@@ -74,9 +74,14 @@ pthread_t groupSending;
 void * groupSendingFunc();
 void * groupReceivingFunc(void * argI);
 
-char *myIP = "192.168.1.40";
-char *ip0 = "192.168.1.39";
-char *ip1 = "127.0.0.1";
+char *myIP = "10.35.70.7";
+char *ip0 = "10.35.70.41";
+char *ip1 = "10.35.70.27";
+char *ip2 = "10.35.70.42";
+char *ip3 = "10.35.70.43";
+
+
+
 
 int main(int argc, char const *argv[]) {
 
@@ -114,9 +119,10 @@ int main(int argc, char const *argv[]) {
         printf("Video calling will not work on the raspberry pi, try again\n");
         goto promptUser;
     } else if (mode == 2){
+	printf("This does not work entirely as desired, you will have to set the myIP variable for every device and you will have to set the destination IPs for the device that creates the groupchat\nThis can be done at the top of the code right above main\n");
         printf("How do you want to appear to other users? (Nick name)\n");
         scanf("%199s", nick);
-        stateSelect:
+	stateSelect:
         printf("Do you want to create the groupchat or allow another person to create one with you in it?\n    ~1     Create your own groupchat\n    ~2    Join a groupchat\n");
         char userState[200];
         scanf("%s", userState);
@@ -145,10 +151,10 @@ int main(int argc, char const *argv[]) {
                         return -1;
                     }
 
-                    printf("Socket is %i\n", receivers[i].socket);
+                    //printf("Socket is %i\n", receivers[i].socket);
 
                 }
-                printf("All sockets opened\n");
+                //printf("All sockets opened\n");
 
 
                 int result;
@@ -201,7 +207,8 @@ int main(int argc, char const *argv[]) {
         int i  = 1;
         IPamount = 1;
         printf("Give the first IP address you want to create a group chat with\n");
-        scanf("%19s", receivers[0].destinationIP);
+        printf("This doesn't function correctly, type anything, just match amount of addresses provided with the amount of destination IPs desired\n");
+	scanf("%19s", receivers[0].destinationIP);
 
         // Create UDP socket
         if ((receivers[0].socket = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
@@ -428,9 +435,6 @@ void getIPandPort(){
     scanf("%15s", ip);
 }
 
-char *ip2 = "127.0.0.1";
-char *ip3 = "127.0.0.1";
-
 int joinedState[USER_MAX];
 
 void* groupSendingFunc() {
@@ -443,7 +447,7 @@ void* groupSendingFunc() {
         joinedState[i] = 0;
     }
     for (;;) {
-        printf("Group sending function entered\n");
+        //printf("Group sending function entered\n");
         if(userGroupState == 1){
             int finished = 1;
             // Get ACK from other nodes and once connection is established send the user list
@@ -451,7 +455,10 @@ void* groupSendingFunc() {
                 if(joinedState[i] == 0){
                     finished = 0;
                     sprintf(message, "~~JOIN%s", myIP);
-                    printf("sending: %s\n", message);
+                   // printf("sending: %s\n", message);
+
+			inet_pton(AF_INET, receivers[i].destinationIP, &peer_addr.sin_addr);
+
                     result = sendto(receivers[i].socket, message, strlen(message), 0, (sockaddr*)&peer_addr, sizeof(peer_addr));
                     if (result == -1) {
                         perror("Error sending message");
@@ -463,12 +470,15 @@ void* groupSendingFunc() {
         fgets(message, sizeof(message), stdin);
         // Remove the trailing newline character from the message
         message[strcspn(message, "\n")] = '\0';
-        printf("Sending message: %s\n", message); 
+        //printf("Sending message: %s\n", message); 
         for (int i = 0; i < USER_MAX; i++) {
-            if(receivers[i].socket >= 3 && receivers[i].validated == 1){ 
+            if(receivers[i].socket >= 3 || receivers[i].validated == 1){ 
                 if(strcmp(message,"") == 0 || message == NULL){
                     break;
                 } 
+
+		inet_pton(AF_INET, receivers[i].destinationIP, &peer_addr.sin_addr);
+
                 result = sendto(receivers[i].socket, message, strlen(message), 0, (sockaddr*)&peer_addr, sizeof(peer_addr));
                 //printf("Sending %s to %i\n", message, receivers[i].socket);
                 
@@ -476,7 +486,7 @@ void* groupSendingFunc() {
                     printf("Message couldn't send\n");
                 }
             } else {
-                printf("Invalid socket\n");
+                //printf("Socket %i is invalid, it is number %i and it has a validation state of %i\n", i, receivers[i].socket, receivers[i].validated);
             }
         }
     }
@@ -538,7 +548,7 @@ void* groupReceivingFunc(void* arg) {
                                     char amount[20];
                                     strcpy(amount, &buffer[3]);
                                     IPamount = atoi(amount);
-                                    printf("%i\n", IPamount);
+                                    //printf("%i\n", IPamount);
                                     for(int j = 0; j < IPamount; j++){
                                         if(j != i){
                                             receivers[j].validated = 1;
@@ -588,7 +598,7 @@ void* groupReceivingFunc(void* arg) {
         }
     }
     
-    printf("exited the big set-up loop\n");
+    //printf("exited the big set-up loop\n");
     int index = *((int*)arg);
     
     int n;
